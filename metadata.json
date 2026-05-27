@@ -1,0 +1,6 @@
+{
+  "name": "Free Movie & Series Stream",
+  "description": "Stream movies, web series, and anime for free with a clean, ad-free interface, search recommendations, and offline capability simulations.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
