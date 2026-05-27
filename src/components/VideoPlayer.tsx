@@ -163,49 +163,73 @@ export default function VideoPlayer({
     <div className="min-h-screen bg-[#050505] text-white flex flex-col relative" id="global-video-player font-sans pb-12">
       
       {/* Top Header Controls bar */}
-      <div className="bg-black/90 border-b border-white/5 p-4 flex items-center justify-between z-10 shrink-0">
-        <button
-          onClick={onClose}
-          className="flex items-center gap-2 text-slate-400 hover:text-white transition-all font-display text-xs font-bold uppercase tracking-widest pr-3 cursor-pointer"
-          id="player-back-to-browse"
-        >
-          <ArrowLeft className="w-5 h-5 text-brand-400" />
-          <span>Exit Theatre</span>
-        </button>
+      <div className="bg-black/95 border-b border-white/5 p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4 z-10 shrink-0">
+        
+        {/* Left Row / Top Row on Mobile: Exit Theatre & Mobile Direct Link Actions */}
+        <div className="flex items-center justify-between w-full md:w-auto gap-3">
+          <button
+            onClick={onClose}
+            className="flex items-center gap-1.5 text-slate-300 hover:text-white transition-all font-display text-[10px] sm:text-xs font-bold uppercase tracking-widest cursor-pointer shrink-0"
+            id="player-back-to-browse"
+          >
+            <ArrowLeft className="w-4.5 h-4.5 text-brand-400" />
+            <span>Exit Theatre</span>
+          </button>
 
-        <div className="text-center">
-          <h2 className="font-extrabold text-sm sm:text-base tracking-tight text-white uppercase italic text-glow line-clamp-1">
+          {/* Direct Link prominent shortcut on mobile */}
+          <div className="flex md:hidden items-center gap-2">
+            {!isOfflineMode && (
+              <a
+                href={iframePatternUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-400 text-white rounded-full text-[9px] font-black tracking-widest uppercase transition-all shadow-md shrink-0 cursor-pointer text-glow"
+                id="external-stream-launcher-mobile"
+                title="Bypass nested iframe blocks by opening the gateway directly in a new window"
+              >
+                <ExternalLink className="w-3 h-3 text-white" />
+                <span>Direct Link</span>
+              </a>
+            )}
+          </div>
+        </div>
+
+        {/* Center Title Column: centered on Desktop, stacked on Mobile */}
+        <div className="text-left md:text-center flex-1 min-w-0 py-0.5 md:py-0">
+          <h2 className="font-extrabold text-xs sm:text-sm md:text-base tracking-tight text-white uppercase italic text-glow truncate">
             Now Streaming: {activeMedia.title}
           </h2>
           {isShow && (
-            <p className="text-[10px] text-slate-400 font-mono font-bold mt-0.5 tracking-wider">
+            <p className="text-[9px] sm:text-[10px] text-slate-400 font-mono font-bold mt-0.5 tracking-wider">
               Season {season} • Episode {episode}
             </p>
           )}
         </div>
 
-        <div className="flex items-center gap-2.5">
+        {/* Right Row Actions: Hidden on mobile if redundant, or formatted beautifully */}
+        <div className="flex items-center justify-between md:justify-end gap-2.5 w-full md:w-auto border-t border-white/5 pt-2.5 md:pt-0 md:border-none">
           {isOfflineMode ? (
-            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[9px] font-black tracking-widest font-mono bg-amber-500/10 border border-amber-500/20 text-amber-400 uppercase">
-              <WifiOff className="w-3.5 h-3.5" />
+            <span className="flex items-center gap-1.5 px-3 py-1 rounded-full text-[8px] sm:text-[9px] font-black tracking-widest font-mono bg-amber-500/10 border border-amber-500/20 text-amber-400 uppercase">
+              <WifiOff className="w-3 h-3" />
               <span>OFFLINE DISK PLAYBACK</span>
             </span>
           ) : (
-            <div className="flex items-center gap-2 sm:gap-3">
-              <div className="flex items-center gap-1 sm:gap-2">
-                <span className="hidden sm:inline-block text-[9px] font-bold tracking-widest font-mono text-slate-400 uppercase">
-                  Active Gateway:
+            <div className="flex items-center justify-between md:justify-end gap-2 sm:gap-3 w-full md:w-auto">
+              {/* Server selector */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[8px] sm:text-[9px] font-bold tracking-widest font-mono text-slate-400 uppercase">
+                  Gateway:
                 </span>
-                <div className="bg-brand-500/10 border border-brand-500/20 rounded-full px-2.5 py-1 flex items-center gap-1">
+                <div className="bg-brand-500/10 border border-brand-500/20 rounded-full px-2.5 py-0.5 flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-brand-400 animate-pulse shrink-0" />
                   <select
                     value={serverId}
                     onChange={(e) => onServerChange?.(e.target.value)}
-                    className="bg-transparent border-none text-[9px] font-black tracking-widest font-mono text-brand-400 focus:outline-none focus:ring-0 cursor-pointer uppercase pr-1 py-0"
+                    className="bg-transparent border-none text-[8px] sm:text-[9px] font-black tracking-widest font-mono text-brand-400 focus:outline-none focus:ring-0 cursor-pointer uppercase pr-1 py-0.5"
                     id="player-server-select"
                   >
                     {servers?.map((s) => (
-                      <option key={s.id} value={s.id} className="bg-[#050505] text-slate-200 font-sans tracking-normal font-medium">
+                      <option key={s.id} value={s.id} className="bg-[#050505] text-slate-200 font-sans tracking-normal font-medium normal-case">
                         {s.name.split(' (')[0]}
                       </option>
                     ))}
@@ -213,49 +237,64 @@ export default function VideoPlayer({
                 </div>
               </div>
 
-              {/* Direct Link external bypass button */}
-              <a
-                href={iframePatternUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-400 text-white rounded-full text-[9px] font-black tracking-widest uppercase transition-all shadow-md shrink-0 cursor-pointer text-glow"
-                id="external-stream-launcher"
-                title="Bypass nested iframe blocks by opening the gateway directly in a new window"
-              >
-                <ExternalLink className="w-3 h-3 text-white" />
-                <span>Direct Link</span>
-              </a>
+              {/* Direct Link for Desktop */}
+              <div className="hidden md:block">
+                <a
+                  href={iframePatternUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-brand-500 hover:bg-brand-400 text-white rounded-full text-[9px] font-black tracking-widest uppercase transition-all shadow-md shrink-0 cursor-pointer text-glow"
+                  id="external-stream-launcher-desktop"
+                  title="Bypass nested iframe blocks by opening the gateway directly in a new window"
+                >
+                  <ExternalLink className="w-3 h-3 text-white" />
+                  <span>Direct Link</span>
+                </a>
+              </div>
             </div>
           )}
         </div>
       </div>
 
       {/* Main player box view area */}
-      <div className="flex-1 flex items-center justify-center relative bg-black p-2 sm:p-6 select-none overflow-hidden">
+      <div className="flex-1 flex flex-col items-center justify-center relative bg-black p-2 sm:p-6 select-none overflow-y-auto">
         
         {!isOfflineMode ? (
           /* ONLINE MODE REAL STREAM PORTAL EMBED COVER */
-          <div className="w-full max-w-5xl aspect-video rounded-3xl overflow-hidden glass border border-white/10 shadow-2xl relative">
+          <div className="w-full max-w-5xl flex flex-col gap-4">
             
-            {/* The secure ad-blocker sandboxed Cover Iframe! */}
-            <iframe
-              src={iframePatternUrl}
-              className="w-full h-full bg-black/90"
-              allowFullScreen
-              referrerPolicy="no-referrer"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-pointer-lock"
-              title="Secure ImdbCover Feed"
-              id="cinematic-iframe-stream"
-            />
+            {/* Aspect Ratio Video container */}
+            <div className="w-full aspect-video rounded-3xl overflow-hidden glass border border-white/10 shadow-2xl relative bg-black">
+              {/* The secure ad-blocker sandboxed Cover Iframe! */}
+              <iframe
+                src={iframePatternUrl}
+                className="w-full h-full bg-black/90"
+                allowFullScreen
+                referrerPolicy="no-referrer"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-pointer-lock"
+                title="Secure ImdbCover Feed"
+                id="cinematic-iframe-stream"
+              />
+            </div>
 
-            {/* Float HUD Information Alert to guide the user */}
+            {/* Non-intrusive Flow Notice underneath the video, completely clear of the playback view */}
             {showSandboxAlert && (
-              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/94 backdrop-blur-md rounded-2xl px-5 py-2.5 text-[10px] sm:text-[11px] text-slate-300 border border-white/10 flex items-center justify-between gap-3 shadow-xl max-w-[95%] w-fit sm:w-[500px] font-semibold leading-relaxed z-23">
-                <div className="flex items-center gap-2">
-                  <ShieldAlert className="w-4.5 h-4.5 text-cyan-400 shrink-0 animate-bounce" />
-                  <span>
-                    Embed blocked by nested sandbox policies? Click the green <strong className="text-brand-400">Direct Link</strong> button in the top-right to watch seamlessly in a new tab!
-                  </span>
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-brand-500/10 border border-brand-500/20 rounded-2xl p-4 text-xs text-slate-300 flex items-start justify-between gap-3 shadow-xl w-full leading-relaxed z-10"
+              >
+                <div className="flex items-start gap-2.5">
+                  <ShieldAlert className="w-5 h-5 text-cyan-400 shrink-0 mt-0.5 animate-pulse" />
+                  <div>
+                    <h4 className="font-bold text-white flex items-center gap-1.5 mb-1 text-xs uppercase tracking-wider">
+                      <span>Gateway Sandbox Alert</span>
+                      <span className="text-[9px] font-black tracking-widest uppercase bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded">Active Protection</span>
+                    </h4>
+                    <p className="text-slate-400 text-[11px] leading-relaxed">
+                      If the video screen displays blank, gets blocked, or shows 404, it might be due to nested mobile sandbox restrictions. Simply tap the prominent <strong className="text-brand-400">Direct Link</strong> button in the top bar to watch the stream in full-speed, ad-free standalone mode!
+                    </p>
+                  </div>
                 </div>
                 <button
                   onClick={() => setShowSandboxAlert(false)}
@@ -263,9 +302,9 @@ export default function VideoPlayer({
                   id="dismiss-sandbox-hud"
                   title="Dismiss Note"
                 >
-                  <X className="w-3.5 h-3.5" />
+                  <X className="w-4 h-4" />
                 </button>
-              </div>
+              </motion.div>
             )}
           </div>
         ) : (
