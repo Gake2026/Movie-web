@@ -44,7 +44,7 @@ export default function Header({
       scrolled ? 'glass bg-[#050505]/85 shadow-2xl py-3' : 'bg-transparent py-5'
     }`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
           
           {/* Brand Logo & Tabs */}
           <div className="flex items-center justify-between md:justify-start gap-8">
@@ -149,13 +149,13 @@ export default function Header({
 
         {/* Categories strip for Browse Tab */}
         {activeTab === 'browse' && (
-          <div className="flex items-center justify-between border-t border-white/5 mt-4 pt-3 flex-wrap gap-2 text-xs">
-            <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full">
+          <div className="flex items-center justify-between border-t border-white/5 mt-3 pt-2.5 gap-2 text-xs">
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 max-w-full scrollbar-none">
               {(['all', 'movie', 'series', 'anime'] as const).map((type) => (
                 <button
                   key={type}
                   onClick={() => setSelectedType(type)}
-                  className={`px-4 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase transition-all duration-200 border ${
+                  className={`px-4 py-1 rounded-full text-[11px] font-bold tracking-wider uppercase transition-all duration-200 border cursor-pointer shrink-0 ${
                     selectedType === type
                       ? 'bg-brand-500 text-white border-brand-500 shadow-md font-bold'
                       : 'bg-white/5 text-slate-400 border-transparent hover:text-white hover:bg-white/10'
@@ -167,7 +167,7 @@ export default function Header({
               ))}
             </div>
 
-            <div className="flex items-center gap-2 text-[10px] text-slate-500 uppercase font-black tracking-widest">
+            <div className="hidden sm:flex items-center gap-2 text-[10px] text-slate-500 uppercase font-black tracking-widest shrink-0">
               <Sparkles className="w-3 h-3 text-brand-400" />
               <span>Global Protocol Streaming</span>
             </div>

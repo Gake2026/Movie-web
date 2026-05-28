@@ -14,7 +14,9 @@ import {
   MonitorPlay,
   Heart,
   HardDriveDownload,
-  Info
+  Info,
+  Minus,
+  Plus
 } from 'lucide-react';
 
 // Types and static featured catalog
@@ -109,8 +111,15 @@ export default function App() {
   const [onDemandType, setOnDemandType] = useState<MediaType>("movie");
   const [onDemandSeason, setOnDemandSeason] = useState(1);
   const [onDemandEpisode, setOnDemandEpisode] = useState(1);
+  const [onDemandManualOverride, setOnDemandManualOverride] = useState(false);
   const [onDemandLoading, setOnDemandLoading] = useState(false);
   const [onDemandError, setOnDemandError] = useState("");
+  const [onDemandResolvedItem, setOnDemandResolvedItem] = useState<MediaItem | null>(null);
+
+  // Auto-clear resolved item when search title or type changes to require new resolution
+  useEffect(() => {
+    setOnDemandResolvedItem(null);
+  }, [onDemandTitle, onDemandType]);
 
   // Downloads tracking (Persists in localStorage)
   const [downloads, setDownloads] = useState<DownloadItem[]>(() => {
@@ -296,7 +305,7 @@ export default function App() {
     handlePlayMedia(media, isShow ? 1 : 0, isShow ? 1 : 0, selectedServerId);
   };
 
-  // On-demand Quick Stream Importer handler
+  // On-demand Quick Stream Importer handler (Resolves names/IDs first)
   const handleOnDemandPlay = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!onDemandTitle.trim()) {
@@ -306,32 +315,63 @@ export default function App() {
     
     setOnDemandError("");
     setOnDemandLoading(true);
+    setOnDemandResolvedItem(null);
 
     try {
       const queryStr = onDemandTitle.trim();
       const isImdb = /^(tt\d{7,10})$/i.test(queryStr);
       let finalImdbId = "";
       let finalTitle = queryStr;
+      let resolvedItem: MediaItem | null = null;
 
       if (isImdb) {
         finalImdbId = queryStr.toLowerCase();
-        finalTitle = `IMDb Link [${queryStr}]`;
+        finalTitle = `IMDb Link [${queryStr.toUpperCase()}]`;
+        
+        resolvedItem = {
+          id: finalImdbId,
+          title: finalTitle,
+          type: onDemandType,
+          year: new Date().getFullYear().toString(),
+          rating: "9.0",
+          genres: ["Action", "Thriller"],
+          overview: `Direct stream launched via IMDb profile ID: ${finalImdbId}.`,
+          imdbId: finalImdbId,
+          poster: `https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&q=80&w=600`,
+          banner: `https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&q=80&w=1200`,
+          seasonsCount: onDemandType !== "movie" ? 5 : undefined,
+          episodesCount: onDemandType !== "movie" ? 50 : undefined,
+          episodesPerSeason: onDemandType !== "movie" ? Array(5).fill(10) : undefined
+        };
       } else {
-        // Search our local static featured items first to see if we have it!
+        // Search our local static featured items first
         const localMatch = FEATURED_MEDIA.find(
           item => item.title.toLowerCase() === queryStr.toLowerCase()
         );
         if (localMatch) {
-          finalImdbId = localMatch.id;
-          finalTitle = localMatch.title;
+          resolvedItem = localMatch;
         } else {
           // Fetch from search API
           const res = await fetch(`/api/search?q=${encodeURIComponent(queryStr)}`);
           const data = await res.json();
           if (data.results && data.results.length > 0) {
-            const best = data.results[0];
-            finalImdbId = best.id;
-            finalTitle = best.title;
+            // Pick first matching item that respects type if possible, or fallback first
+            const matchedType = data.results.find((r: any) => r.type === onDemandType) || data.results[0];
+            resolvedItem = {
+              id: matchedType.id,
+              title: matchedType.title,
+              type: matchedType.type || onDemandType,
+              year: matchedType.year || new Date().getFullYear().toString(),
+              rating: matchedType.rating || "8.5",
+              genres: matchedType.genres || ["Action", "Drama"],
+              overview: matchedType.overview || `Loaded instantly via StreamIMDb secure ad-free live player gateway.`,
+              imdbId: matchedType.imdbId || matchedType.id,
+              poster: matchedType.poster,
+              banner: matchedType.banner,
+              seasonsCount: matchedType.seasonsCount || (matchedType.type !== "movie" ? 1 : undefined),
+              episodesCount: matchedType.episodesCount || (matchedType.type !== "movie" ? 10 : undefined),
+              episodesPerSeason: matchedType.episodesPerSeason || (matchedType.type !== "movie" ? [10] : undefined)
+            };
           } else {
             // Generate a stable IMDb ID procedurally
             let hash = 0;
@@ -340,44 +380,63 @@ export default function App() {
             }
             const absHash = Math.abs(hash);
             finalImdbId = `tt${(absHash % 8999999) + 1000000}`;
+            
+            resolvedItem = {
+              id: finalImdbId,
+              title: queryStr.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(" "),
+              type: onDemandType,
+              year: new Date().getFullYear().toString(),
+              rating: "8.5",
+              genres: ["Action", "Adventure"],
+              overview: `High-fidelity custom stream loaded on-demand.`,
+              imdbId: finalImdbId,
+              poster: `https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&q=80&w=600`,
+              banner: `https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&q=80&w=1200`,
+              seasonsCount: onDemandType !== "movie" ? 1 : undefined,
+              episodesCount: onDemandType !== "movie" ? 12 : undefined,
+              episodesPerSeason: onDemandType !== "movie" ? [12] : undefined
+            };
           }
         }
       }
 
-      const onDemandMedia: MediaItem = {
-        id: finalImdbId,
-        title: finalTitle,
-        type: onDemandType,
-        year: new Date().getFullYear().toString(),
-        rating: "8.5",
-        genres: ["Adventure", "Action", "Drama"],
-        overview: `A high-speed StreamIMDb global ad-free stream loaded on-demand.`,
-        imdbId: finalImdbId,
-        poster: `https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&q=80&w=600`,
-        banner: `https://images.unsplash.com/photo-1536440136628-849c177e76a1?auto=format&q=80&w=1200`
-      };
-
-      setPlayerState({
-        activeMedia: onDemandMedia,
-        season: onDemandType !== "movie" ? onDemandSeason : 0,
-        episode: onDemandType !== "movie" ? onDemandEpisode : 0,
-        serverId: selectedServerId
-      });
-      setActiveTab("playing");
-      
-      // Auto-add to search results list so it displays in their browse lists for visual evidence
-      setSearchResults(prev => {
-        if (!prev.some(i => i.id === finalImdbId)) {
-          return [onDemandMedia, ...prev];
-        }
-        return prev;
-      });
+      if (resolvedItem) {
+        setOnDemandResolvedItem(resolvedItem);
+        setOnDemandType(resolvedItem.type);
+        setOnDemandSeason(1);
+        setOnDemandEpisode(1);
+      } else {
+        setOnDemandError("No matching title found. Check spelling.");
+      }
       
     } catch (err: any) {
       setOnDemandError("Stream extraction mismatch. Please try again.");
     } finally {
       setOnDemandLoading(false);
     }
+  };
+
+  // Launch the stream once they have resolved and chosen season/episode
+  const handleOnDemandLaunch = () => {
+    if (!onDemandResolvedItem) return;
+    
+    const isShow = onDemandResolvedItem.type === 'series' || onDemandResolvedItem.type === 'anime';
+    
+    setPlayerState({
+      activeMedia: onDemandResolvedItem,
+      season: isShow ? onDemandSeason : 0,
+      episode: isShow ? onDemandEpisode : 0,
+      serverId: selectedServerId
+    });
+    setActiveTab("playing");
+
+    // Auto-add to search results list so it displays in their browse lists for visual evidence
+    setSearchResults(prev => {
+      if (!prev.some(i => i.id === onDemandResolvedItem.id)) {
+        return [onDemandResolvedItem, ...prev];
+      }
+      return prev;
+    });
   };
 
   // Direct visual play item from downloads tab
@@ -433,7 +492,7 @@ export default function App() {
       )}
 
       {/* Primary tab views container */}
-      <main className={`${activeTab !== 'playing' ? 'pt-32 sm:pt-40 pb-20' : ''}`}>
+      <main className={`${activeTab !== 'playing' ? 'pt-[180px] sm:pt-[190px] md:pt-[136px] lg:pt-[130px] pb-20' : ''}`}>
         
         {activeTab === 'browse' && (
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -569,35 +628,7 @@ export default function App() {
                       </select>
                     </div>
 
-                    {/* Optional Season & Episode selectors for series/anime */}
-                    {(onDemandType === "series" || onDemandType === "anime") && (
-                      <div className="flex gap-2 shrink-0">
-                        <div className="w-16">
-                          <input
-                            type="number"
-                            min="1"
-                            title="Season"
-                            placeholder="S"
-                            value={onDemandSeason}
-                            onChange={(e) => setOnDemandSeason(Math.max(1, parseInt(e.target.value) || 1))}
-                            className="w-full text-center py-2.5 text-xs rounded-2xl bg-black border border-white/10 text-white focus:outline-none placeholder-slate-500"
-                          />
-                        </div>
-                        <div className="w-16">
-                          <input
-                            type="number"
-                            min="1"
-                            title="Episode"
-                            placeholder="E"
-                            value={onDemandEpisode}
-                            onChange={(e) => setOnDemandEpisode(Math.max(1, parseInt(e.target.value) || 1))}
-                            className="w-full text-center py-2.5 text-xs rounded-2xl bg-black border border-white/10 text-white focus:outline-none placeholder-slate-500"
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Play Button */}
+                    {/* Search Button */}
                     <button
                       type="submit"
                       disabled={onDemandLoading}
@@ -605,18 +636,229 @@ export default function App() {
                     >
                       {onDemandLoading ? (
                         <>
-                          <div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin animate-spin" />
-                          <span>Preparing</span>
+                          <div className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+                          <span>Searching</span>
                         </>
                       ) : (
                         <>
                           <Play className="w-3.5 h-3.5 fill-current" />
-                          <span>Quick Stream</span>
+                          <span>Search Stream</span>
                         </>
                       )}
                     </button>
                   </form>
                 </div>
+
+                {/* Sub-Layout: Rendered after search resolves */}
+                {onDemandResolvedItem && (
+                  <motion.div 
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-6 pt-5 border-t border-white/10 flex flex-col md:flex-row items-stretch md:items-center justify-between gap-6"
+                  >
+                    <div className="flex items-center gap-4 text-left">
+                      <img 
+                        src={onDemandResolvedItem.poster} 
+                        alt="" 
+                        referrerPolicy="no-referrer"
+                        className="w-12 h-16 rounded-xl object-cover border border-white/10 shadow-md shrink-0" 
+                        onError={(e) => {
+                          e.currentTarget.src = `https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&q=80&w=600`;
+                        }}
+                      />
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <span className="px-2 py-0.5 rounded-md text-[8px] font-black uppercase tracking-widest bg-brand-500/10 text-brand-400 border border-brand-500/20">
+                            {onDemandResolvedItem.type}
+                          </span>
+                          <span className="text-slate-400 text-xs font-bold font-mono">{onDemandResolvedItem.year}</span>
+                        </div>
+                        <h4 className="text-sm font-black font-display uppercase tracking-tight text-white mt-1 text-glow">
+                          {onDemandResolvedItem.title}
+                        </h4>
+                        <span className="text-[10px] font-mono text-slate-500 mt-0.5 block">IMDb ID: {onDemandResolvedItem.imdbId}</span>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4">
+                      {/* Optional Season & Episode selectors for series/anime */}
+                      {(onDemandResolvedItem.type === "series" || onDemandResolvedItem.type === "anime") && (() => {
+                        const onDemandSeasonsLimit = onDemandResolvedItem.seasonsCount || 1;
+                        const onDemandEpisodesLimit = onDemandResolvedItem.episodesPerSeason?.[onDemandSeason - 1] || 
+                          (onDemandResolvedItem.episodesCount ? Math.ceil(onDemandResolvedItem.episodesCount / onDemandSeasonsLimit) : 12);
+
+                        return (
+                          <div className="flex flex-col gap-2">
+                            <div className="flex items-center justify-between px-1">
+                              <span className="text-[9px] text-slate-500 uppercase font-black font-mono tracking-widest">Episode Stream Settings</span>
+                              <button
+                                type="button"
+                                onClick={() => setOnDemandManualOverride(prev => !prev)}
+                                className={`text-[8px] font-bold font-mono px-2 py-0.5 rounded border transition-all cursor-pointer ${
+                                  onDemandManualOverride 
+                                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 animate-pulse' 
+                                    : 'bg-white/5 border-white/10 text-slate-400 hover:text-slate-100 hover:bg-white/10'
+                                }`}
+                                id="ondemand-manual-override-btn"
+                              >
+                                {onDemandManualOverride ? "🔓 Custom Entries Unlocked" : "🔒 Change Limit Locked"}
+                              </button>
+                            </div>
+
+                            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-4 bg-black/30 p-3 rounded-2xl border border-white/5">
+                              {/* Season component */}
+                              <div className="flex flex-col gap-1 text-left min-w-[130px]">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] text-slate-400 uppercase tracking-widest font-black font-mono">Season</span>
+                                  <span className="text-[9px] text-slate-500 font-mono">
+                                    {onDemandManualOverride ? `Season ${onDemandSeason} (Custom)` : `${onDemandSeason} of ${onDemandSeasonsLimit}`}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOnDemandSeason(prev => Math.max(1, prev - 1));
+                                      setOnDemandEpisode(1);
+                                    }}
+                                    disabled={onDemandSeason <= 1}
+                                    className="w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-white/10 border border-white/5 text-slate-300 disabled:opacity-20 disabled:hover:bg-black/60 rounded-lg transition-all cursor-pointer"
+                                    id="ondemand-season-minus"
+                                  >
+                                    <Minus className="w-3 h-3" />
+                                  </button>
+                                  
+                                  <div className="relative flex-1">
+                                    {onDemandManualOverride ? (
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={100}
+                                        value={onDemandSeason}
+                                        onChange={(e) => {
+                                          const val = Math.max(1, parseInt(e.target.value) || 1);
+                                          setOnDemandSeason(val);
+                                          setOnDemandEpisode(1);
+                                        }}
+                                        className="w-full h-8 bg-black/80 text-center text-xs font-black font-mono text-white border border-white/10 rounded-lg focus:outline-none focus:border-brand-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-1 py-0"
+                                        id="ondemand-season-custom-input"
+                                      />
+                                    ) : (
+                                      <select
+                                        value={onDemandSeason}
+                                        onChange={(e) => {
+                                          const val = Math.min(onDemandSeasonsLimit, Math.max(1, parseInt(e.target.value) || 1));
+                                          setOnDemandSeason(val);
+                                          setOnDemandEpisode(1);
+                                        }}
+                                        className="w-full h-8 bg-black/80 text-center text-xs font-black font-mono text-white border border-white/10 rounded-lg focus:outline-none focus:border-brand-500 cursor-pointer px-1 py-0"
+                                        id="ondemand-season-dropdown"
+                                      >
+                                        {Array.from({ length: onDemandSeasonsLimit }).map((_, idx) => (
+                                          <option key={idx + 1} value={idx + 1} className="bg-[#0c0c0c] text-slate-200">
+                                            Season {idx + 1}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    )}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setOnDemandSeason(prev => onDemandManualOverride ? prev + 1 : Math.min(onDemandSeasonsLimit, prev + 1));
+                                      setOnDemandEpisode(1);
+                                    }}
+                                    disabled={!onDemandManualOverride && onDemandSeason >= onDemandSeasonsLimit}
+                                    className="w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-white/10 border border-white/5 text-slate-300 disabled:opacity-20 disabled:hover:bg-black/60 rounded-lg transition-all cursor-pointer"
+                                    id="ondemand-season-plus"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+
+                              <div className="hidden sm:block text-slate-600 font-mono text-sm">/</div>
+
+                              {/* Episode component */}
+                              <div className="flex flex-col gap-1 text-left min-w-[130px]">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-[10px] text-slate-400 uppercase tracking-widest font-black font-mono">Episode</span>
+                                  <span className="text-[9px] text-slate-500 font-mono">
+                                    {onDemandManualOverride ? `Episode ${onDemandEpisode} (Custom)` : `${onDemandEpisode} of ${onDemandEpisodesLimit}`}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1.5 mt-0.5">
+                                  <button
+                                    type="button"
+                                    onClick={() => setOnDemandEpisode(prev => Math.max(1, prev - 1))}
+                                    disabled={onDemandEpisode <= 1}
+                                    className="w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-white/10 border border-white/5 text-slate-300 disabled:opacity-20 disabled:hover:bg-black/60 rounded-lg transition-all cursor-pointer"
+                                    id="ondemand-episode-minus"
+                                  >
+                                    <Minus className="w-3 h-3" />
+                                  </button>
+
+                                  <div className="relative flex-1">
+                                    {onDemandManualOverride ? (
+                                      <input
+                                        type="number"
+                                        min={1}
+                                        max={2000}
+                                        value={onDemandEpisode}
+                                        onChange={(e) => {
+                                          const val = Math.max(1, parseInt(e.target.value) || 1);
+                                          setOnDemandEpisode(val);
+                                        }}
+                                        className="w-full h-8 bg-black/80 text-center text-xs font-black font-mono text-white border border-white/10 rounded-lg focus:outline-none focus:border-brand-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none px-1 py-0"
+                                        id="ondemand-episode-custom-input"
+                                      />
+                                    ) : (
+                                      <select
+                                        value={onDemandEpisode}
+                                        onChange={(e) => {
+                                          const val = Math.min(onDemandEpisodesLimit, Math.max(1, parseInt(e.target.value) || 1));
+                                          setOnDemandEpisode(val);
+                                        }}
+                                        className="w-full h-8 bg-black/80 text-center text-xs font-black font-mono text-white border border-white/10 rounded-lg focus:outline-none focus:border-brand-500 cursor-pointer px-1 py-0"
+                                        id="ondemand-episode-dropdown"
+                                      >
+                                        {Array.from({ length: onDemandEpisodesLimit }).map((_, idx) => (
+                                          <option key={idx + 1} value={idx + 1} className="bg-[#0c0c0c] text-slate-200">
+                                            Episode {idx + 1}
+                                          </option>
+                                        ))}
+                                      </select>
+                                    )}
+                                  </div>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => setOnDemandEpisode(prev => onDemandManualOverride ? prev + 1 : Math.min(onDemandEpisodesLimit, prev + 1))}
+                                    disabled={!onDemandManualOverride && onDemandEpisode >= onDemandEpisodesLimit}
+                                    className="w-8 h-8 flex items-center justify-center bg-black/60 hover:bg-white/10 border border-white/5 text-slate-300 disabled:opacity-20 disabled:hover:bg-black/60 rounded-lg transition-all cursor-pointer"
+                                    id="ondemand-episode-plus"
+                                  >
+                                    <Plus className="w-3 h-3" />
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+
+                      <button
+                        onClick={handleOnDemandLaunch}
+                        className="py-3 px-6 bg-emerald-500 hover:bg-emerald-400 text-white rounded-2xl text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2 transition-all shadow-md cursor-pointer text-glow mt-2 sm:mt-0"
+                      >
+                        <Play className="w-4 h-4 fill-current text-white" />
+                        <span>Launch Stream</span>
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+
                 {onDemandError && (
                   <div className="text-[11px] text-red-400 font-mono mt-3 text-left">
                     * {onDemandError}

@@ -37,6 +37,12 @@ export default function VideoPlayer({
   const [fullscreenToast, setFullscreenToast] = useState(false);
   const [showSandboxAlert, setShowSandboxAlert] = useState(true);
 
+  // User can choose sandbox style:
+  // - 'unrestricted': Bypasses local mobile blocks completely (No Sandbox). Default for 100% mobile launch success.
+  // - 'compat': Loose sandbox that blocks aggressive ads but allows plugins/redirects.
+  // - 'safe': Strict safety sandbox.
+  const [sandboxMode, setSandboxMode] = useState<'unrestricted' | 'compat' | 'safe'>('unrestricted');
+
   // Web Audio visualization ref for offline playing
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const animationFrameRef = useRef<number | null>(null);
@@ -214,7 +220,7 @@ export default function VideoPlayer({
               <span>OFFLINE DISK PLAYBACK</span>
             </span>
           ) : (
-            <div className="flex items-center justify-between md:justify-end gap-2 sm:gap-3 w-full md:w-auto">
+            <div className="flex items-center justify-between md:justify-end gap-2 sm:gap-3 w-full md:w-auto flex-wrap">
               {/* Server selector */}
               <div className="flex items-center gap-1.5">
                 <span className="text-[8px] sm:text-[9px] font-bold tracking-widest font-mono text-slate-400 uppercase">
@@ -233,6 +239,31 @@ export default function VideoPlayer({
                         {s.name.split(' (')[0]}
                       </option>
                     ))}
+                  </select>
+                </div>
+              </div>
+
+              {/* Sandbox Shield controller for iOS/Android compatibility */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-[8px] sm:text-[9px] font-bold tracking-widest font-mono text-slate-400 uppercase">
+                  Shield:
+                </span>
+                <div className={`px-2.5 py-0.5 rounded-full flex items-center gap-1 border transition-all ${
+                  sandboxMode === 'unrestricted'
+                    ? 'bg-amber-500/10 border-amber-500/20 text-amber-400'
+                    : sandboxMode === 'compat'
+                    ? 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                    : 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                }`}>
+                  <select
+                    value={sandboxMode}
+                    onChange={(e) => setSandboxMode(e.target.value as any)}
+                    className="bg-transparent border-none text-[8px] sm:text-[9px] font-black tracking-widest font-mono focus:outline-none focus:ring-0 cursor-pointer uppercase pr-1 py-0.5 animate-pulse"
+                    id="player-shield-select"
+                  >
+                    <option value="unrestricted" className="bg-[#050505] text-amber-400 font-sans tracking-normal font-medium normal-case">Off (iOS/Android OK)</option>
+                    <option value="compat" className="bg-[#050505] text-blue-400 font-sans tracking-normal font-medium normal-case">Lite Ad-Block</option>
+                    <option value="safe" className="bg-[#050505] text-emerald-400 font-sans tracking-normal font-medium normal-case">Max Ad-Block</option>
                   </select>
                 </div>
               </div>
@@ -271,7 +302,14 @@ export default function VideoPlayer({
                 className="w-full h-full bg-black/90"
                 allowFullScreen
                 referrerPolicy="no-referrer"
-                sandbox="allow-scripts allow-same-origin allow-forms allow-presentation allow-pointer-lock"
+                allow="autoplay; encrypted-media; picture-in-picture"
+                sandbox={
+                  sandboxMode === 'safe'
+                    ? "allow-scripts allow-same-origin allow-forms allow-presentation allow-pointer-lock"
+                    : sandboxMode === 'compat'
+                    ? "allow-scripts allow-same-origin allow-forms allow-presentation allow-pointer-lock allow-popups allow-popups-to-escape-sandbox"
+                    : undefined // completely disabled for maximum compatibility on iOS / Android
+                }
                 title="Secure ImdbCover Feed"
                 id="cinematic-iframe-stream"
               />
@@ -292,7 +330,7 @@ export default function VideoPlayer({
                       <span className="text-[9px] font-black tracking-widest uppercase bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded">Active Protection</span>
                     </h4>
                     <p className="text-slate-400 text-[11px] leading-relaxed">
-                      If the video screen displays blank, gets blocked, or shows 404, it might be due to nested mobile sandbox restrictions. Simply tap the prominent <strong className="text-brand-400">Direct Link</strong> button in the top bar to watch the stream in full-speed, ad-free standalone mode!
+                      If the video screen is black or infinite loads, it indicates your mobile browser (e.g. iOS Safari / Chrome Android) blocks sandboxed frames. Keep <strong className="text-brand-400">Shield OFF</strong>, or try switching <strong className="text-cyan-400">Gateways</strong> or tapping <strong className="text-brand-400">Direct Link</strong>!
                     </p>
                   </div>
                 </div>

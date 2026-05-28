@@ -13,6 +13,8 @@ app.use(express.json());
 
 // Lazy-initialized Gemini client
 let aiInstance: GoogleGenAI | null = null;
+let geminiThrottled = false;
+let geminiCooldownTime = 0;
 
 function getGeminiClient(): GoogleGenAI {
   if (!aiInstance) {
@@ -39,7 +41,17 @@ app.get("/api/search", async (req, res) => {
     return res.status(400).json({ error: "Missing query parameter 'q'" });
   }
 
+  let warningReason = "Ad-Free Streaming Proxy active. Search matches indexed globally.";
+
   try {
+    const isKeyUnconfigured = !process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === "MY_GEMINI_API_KEY";
+    const now = Date.now();
+    const isCooldownActive = geminiThrottled && now < geminiCooldownTime;
+
+    if (isCooldownActive || isKeyUnconfigured) {
+      throw new Error("Gemini quota or configuration bypass active");
+    }
+
     const ai = getGeminiClient();
     
     const response = await ai.models.generateContent({
@@ -98,7 +110,27 @@ app.get("/api/search", async (req, res) => {
 
     res.json({ results: processedResults });
   } catch (err: any) {
-    console.error("Gemini lookup failed or key not configured. Falling back to local offline recommendation search.", err.message);
+    const errorString = String(err.message || "") + " " + JSON.stringify(err);
+    const isRateLimit = errorString.includes("429") || errorString.includes("RESOURCE_EXHAUSTED") || errorString.includes("quota") || errorString.includes("limit");
+    const isBypass = err.message === "Gemini quota or configuration bypass active";
+
+    if (isBypass) {
+      console.log(`[Gemini Search Bypass] Active. Routing query "${query}" to fast suggestions API and local index.`);
+      const isKeyUnconfigured = !process.env.GEMINI_API_KEY || process.env.GEMINI_API_KEY === "MY_GEMINI_API_KEY";
+      if (isKeyUnconfigured) {
+        warningReason = "Gemini Key Not Configured. Using high-speed ad-free local index fallback.";
+      } else {
+        warningReason = "Gemini API Cooldown Active (429 Rate Limit Protection). Using local index.";
+      }
+    } else if (isRateLimit) {
+      geminiThrottled = true;
+      geminiCooldownTime = Date.now() + 5 * 60 * 1000; // 5 minute cooldown
+      console.warn(`[Gemini API Warning] Rate limit or quota exceeded (429 RESOURCE_EXHAUSTED). Offline fallback active.`);
+      warningReason = "Gemini API Quota Exceeded (429 RESOURCE_EXHAUSTED). Offline fallback index active.";
+    } else {
+      console.warn(`[Gemini API Warning] Direct query lookup failed:`, err.message || err);
+      warningReason = "Gemini Query Failed. Using high-speed ad-free offline local index fallback.";
+    }
     
     // Extends search index with over 65 popular titles mapped directly to real IMDb IDs for true-play accuracy.
     const mockList = [
@@ -335,12 +367,74 @@ app.get("/api/search", async (req, res) => {
       }
     ];
 
+    let results: any[] = [];
+
+    // Try to fetch from IMDb Suggestion API to resolve real names/IDs
+    try {
+      const imdbResponse = await fetch(`https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(query)}.json`, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "application/json"
+        }
+      });
+      if (imdbResponse.ok) {
+        const imdbData = await imdbResponse.json();
+        if (imdbData && Array.isArray(imdbData.d)) {
+          for (const item of imdbData.d) {
+            if (item.id && item.id.startsWith("tt")) {
+              const qVal = (item.q || "").toLowerCase();
+              const lVal = (item.l || "").toLowerCase();
+              
+              const isSeries = qVal.includes("series") || qVal.includes("show") || qVal.includes("tv") || qVal.includes("episode") || qVal.includes("season");
+              const isAnime = lVal.includes("anime") || qVal.includes("anime") || query.toLowerCase().includes("anime");
+              const mediaType = isAnime ? "anime" : (isSeries ? "series" : "movie");
+              
+              let posterUrl = "";
+              if (item.i && typeof item.i === "object") {
+                posterUrl = item.i.imageUrl || "";
+              } else if (item.i && Array.isArray(item.i)) {
+                posterUrl = item.i[0] || "";
+              }
+              
+              if (!posterUrl) {
+                posterUrl = `https://images.unsplash.com/photo-1440404653325-ab127d49abc1?auto=format&q=80&w=600&fit=crop`;
+              }
+              
+              results.push({
+                id: item.id,
+                title: item.l,
+                type: mediaType,
+                year: item.y ? String(item.y) : "2024",
+                rating: "8.2",
+                genres: item.q ? [item.q] : ["Drama"],
+                overview: `Explore detailed high-fidelity streams for '${item.l}'. Loaded instantly via ad-free proxy server pipelines with full resolution bypass controls. Featuring: ${item.s || "global screen talents"}.`,
+                imdbId: item.id,
+                poster: posterUrl,
+                banner: posterUrl,
+                seasonsCount: mediaType !== "movie" ? 1 : undefined,
+                episodesCount: mediaType !== "movie" ? 10 : undefined,
+                episodesPerSeason: mediaType !== "movie" ? [10] : undefined
+              });
+            }
+          }
+        }
+      }
+    } catch (fetchErr: any) {
+      console.error("Direct IMDb suggestions lookup failed, falling back to local mocks", fetchErr.message);
+    }
+
     // Filter list for matching terms
-    let results = mockList.filter(item => 
+    const matchedMocks = mockList.filter(item => 
       item.title.toLowerCase().includes(query.toLowerCase()) || 
       item.overview.toLowerCase().includes(query.toLowerCase()) ||
       item.genres.some(g => g.toLowerCase().includes(query.toLowerCase()))
     );
+
+    for (const match of matchedMocks) {
+      if (!results.some(r => r.id === match.id)) {
+        results.push(match);
+      }
+    }
 
     // Direct IMDb ID search bypass helper (Allows entering exact IMDb IDs like tt0371746 directly!)
     const directImdbMatch = query.match(/(tt\d{6,10})/i);
@@ -444,7 +538,7 @@ app.get("/api/search", async (req, res) => {
 
     res.json({ 
       results, 
-      warning: "Ad-Free Streaming Proxy active. Search matches indexed globally." 
+      warning: warningReason 
     });
   }
 });

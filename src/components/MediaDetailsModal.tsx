@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Play, Download, Check, Star, Layers, Tv, HardDriveDownload, ShieldCheck, HelpCircle } from 'lucide-react';
+import { X, Play, Download, Check, Star, Layers, Tv, HardDriveDownload, ShieldCheck, HelpCircle, Minus, Plus } from 'lucide-react';
 import { MediaItem, ServerOption } from '../types';
 
 interface MediaDetailsModalProps {
@@ -35,6 +35,7 @@ export default function MediaDetailsModal({
   
   const [selectedSeason, setSelectedSeason] = useState(1);
   const [selectedEpisode, setSelectedEpisode] = useState(1);
+  const [isManualOverride, setIsManualOverride] = useState(false);
 
   const episodesInActiveSeason = episodesPerSeason[selectedSeason - 1] || 12;
 
@@ -172,57 +173,177 @@ export default function MediaDetailsModal({
                 
                 {/* Left/Middle 8-columns: Episode/Stream Play setup */}
                 <div className="md:col-span-8 flex flex-col gap-6">
-                  
-                  {isShow && (
-                    <div className="bg-white/5 border border-white/5 rounded-2xl p-4">
-                      {/* Season picker */}
-                      <div className="flex items-center justify-between mb-3 text-sm">
-                        <span className="font-display font-bold uppercase tracking-wider text-xs text-white flex items-center gap-1.5">
-                          <Layers className="w-4 h-4 text-brand-400" /> Choose Season
+                                   {isShow && (
+                    <div className="bg-white/5 border border-white/5 rounded-2xl p-4 md:p-5 flex flex-col gap-5">
+                      <div className="flex items-center justify-between border-b border-white/5 pb-2">
+                        <span className="font-display font-bold uppercase tracking-wider text-xs text-white flex items-center gap-1.5 font-sans">
+                          <Layers className="w-4 h-4 text-brand-400" /> Watch Episode Setup
                         </span>
-                        <span className="text-xs text-slate-450 font-mono">
-                          {seasonsCount} Season{seasonsCount > 1 ? 's' : ''} available
-                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setIsManualOverride(prev => !prev)}
+                          className={`text-[9px] font-bold font-mono px-2 py-0.5 rounded-md border transition-all cursor-pointer ${
+                            isManualOverride 
+                              ? 'bg-amber-500/20 border-amber-500/40 text-amber-300 animate-pulse' 
+                              : 'bg-white/5 border-white/10 text-slate-400 hover:text-slate-100 hover:bg-white/10'
+                          }`}
+                          id="details-manual-override-toggle"
+                        >
+                          {isManualOverride ? "🔓 Custom Entries Unlocked" : "🔒 Change Limit Locked"}
+                        </button>
                       </div>
-                      
-                      <div className="flex gap-2 overflow-x-auto pb-2">
-                        {Array.from({ length: seasonsCount }).map((_, i) => (
-                          <button
-                            key={i}
-                            onClick={() => { setSelectedSeason(i + 1); setSelectedEpisode(1); }}
-                            className={`px-4 py-2 rounded-full text-[10px] font-black tracking-wider uppercase transition-all duration-200 border shrink-0 cursor-pointer ${
-                              selectedSeason === i + 1
-                                ? 'bg-brand-500 text-white border-brand-500 shadow-md'
-                                : 'bg-black text-slate-400 border-transparent hover:text-white hover:bg-white/5'
-                            }`}
-                            id={`season-selector-${i + 1}`}
-                          >
-                            Season {i + 1}
-                          </button>
-                        ))}
-                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                        {/* SEASON CONTROLLER */}
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-slate-300 uppercase tracking-widest font-mono">Season</span>
+                            <span className="text-[10px] text-slate-500 font-mono">
+                              {isManualOverride ? `Season ${selectedSeason} (Custom/Unlimited)` : `${selectedSeason} of ${seasonsCount}`}
+                            </span>
+                          </div>
 
-                      {/* Episode select list */}
-                      <div className="mt-4">
-                        <span className="text-slate-400 text-xs font-bold uppercase tracking-wider flex items-center gap-1.5 mb-2.5">
-                          <Tv className="w-4 h-4 text-brand-400" /> Select Episode
-                        </span>
-
-                        <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-36 overflow-y-auto pr-1">
-                          {Array.from({ length: episodesInActiveSeason }).map((_, i) => (
+                          <div className="flex items-center gap-2">
+                            {/* Minus Button */}
                             <button
-                              key={i}
-                              onClick={() => setSelectedEpisode(i + 1)}
-                              className={`py-2 rounded-xl text-xs font-bold font-mono border transition-all cursor-pointer ${
-                                selectedEpisode === i + 1
-                                  ? 'bg-brand-500/25 text-white border-brand-550/40 text-glow font-bold'
-                                  : 'bg-black text-slate-400 border-transparent hover:text-white hover:bg-white/5'
-                              }`}
-                              id={`episode-selector-${i + 1}`}
+                              type="button"
+                              onClick={() => {
+                                const nextVal = Math.max(1, selectedSeason - 1);
+                                setSelectedSeason(nextVal);
+                                setSelectedEpisode(1);
+                              }}
+                              disabled={selectedSeason <= 1}
+                              className="w-10 h-10 flex items-center justify-center bg-black hover:bg-white/5 border border-white/10 text-slate-300 disabled:opacity-20 disabled:hover:bg-black rounded-xl transition-all cursor-pointer"
+                              id="season-minus-btn"
                             >
-                              Ep {i + 1}
+                              <Minus className="w-4 h-4" />
                             </button>
-                          ))}
+
+                            {/* Central Input / Dropdown selector */}
+                            <div className="relative flex-1">
+                              {isManualOverride ? (
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={100}
+                                  value={selectedSeason}
+                                  onChange={(e) => {
+                                    const val = Math.max(1, parseInt(e.target.value) || 1);
+                                    setSelectedSeason(val);
+                                    setSelectedEpisode(1);
+                                  }}
+                                  className="w-full h-10 bg-black/85 text-center text-xs font-black font-mono text-white border border-white/10 rounded-xl focus:outline-none focus:border-brand-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  id="season-custom-input"
+                                />
+                              ) : (
+                                <select
+                                  value={selectedSeason}
+                                  onChange={(e) => {
+                                    const val = Math.min(seasonsCount, Math.max(1, parseInt(e.target.value) || 1));
+                                    setSelectedSeason(val);
+                                    setSelectedEpisode(1);
+                                  }}
+                                  className="w-full h-10 bg-black/85 hover:bg-black border border-white/10 rounded-xl px-3.5 py-1.5 text-center text-xs font-black font-mono text-white focus:outline-none focus:border-brand-500 cursor-pointer text-glow block"
+                                  id="season-presets-dropdown"
+                                >
+                                  {Array.from({ length: seasonsCount }).map((_, i) => (
+                                    <option key={i + 1} value={i + 1} className="bg-[#0a0a0a] text-slate-200 font-sans">
+                                      Season {i + 1}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+
+                            {/* Plus Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextVal = isManualOverride 
+                                  ? selectedSeason + 1 
+                                  : Math.min(seasonsCount, selectedSeason + 1);
+                                setSelectedSeason(nextVal);
+                                setSelectedEpisode(1);
+                              }}
+                              disabled={!isManualOverride && selectedSeason >= seasonsCount}
+                              className="w-10 h-10 flex items-center justify-center bg-black hover:bg-white/5 border border-white/10 text-slate-300 disabled:opacity-20 disabled:hover:bg-black rounded-xl transition-all cursor-pointer"
+                              id="season-plus-btn"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* EPISODE CONTROLLER */}
+                        <div className="flex flex-col gap-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[11px] font-bold text-slate-300 uppercase tracking-widest font-mono">Episode</span>
+                            <span className="text-[10px] text-slate-550 font-mono">
+                              {isManualOverride ? `Episode ${selectedEpisode} (Custom/Unlimited)` : `${selectedEpisode} of ${episodesInActiveSeason}`}
+                            </span>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {/* Minus Button */}
+                            <button
+                              type="button"
+                              onClick={() => setSelectedEpisode(Math.max(1, selectedEpisode - 1))}
+                              disabled={selectedEpisode <= 1}
+                              className="w-10 h-10 flex items-center justify-center bg-black hover:bg-white/5 border border-white/10 text-slate-300 disabled:opacity-20 disabled:hover:bg-black rounded-xl transition-all cursor-pointer"
+                              id="episode-minus-btn"
+                            >
+                              <Minus className="w-4 h-4" />
+                            </button>
+
+                            {/* Central Input / Dropdown selector */}
+                            <div className="relative flex-1">
+                              {isManualOverride ? (
+                                <input
+                                  type="number"
+                                  min={1}
+                                  max={2000}
+                                  value={selectedEpisode}
+                                  onChange={(e) => {
+                                    const val = Math.max(1, parseInt(e.target.value) || 1);
+                                    setSelectedEpisode(val);
+                                  }}
+                                  className="w-full h-10 bg-black/85 text-center text-xs font-black font-mono text-white border border-white/10 rounded-xl focus:outline-none focus:border-brand-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                  id="episode-custom-input"
+                                />
+                              ) : (
+                                <select
+                                  value={selectedEpisode}
+                                  onChange={(e) => {
+                                    const val = Math.min(episodesInActiveSeason, Math.max(1, parseInt(e.target.value) || 1));
+                                    setSelectedEpisode(val);
+                                  }}
+                                  className="w-full h-10 bg-black/85 hover:bg-black border border-white/10 rounded-xl px-3.5 py-1.5 text-center text-xs font-black font-mono text-white focus:outline-none focus:border-brand-500 cursor-pointer text-glow block"
+                                  id="episode-presets-dropdown"
+                                >
+                                  {Array.from({ length: episodesInActiveSeason }).map((_, i) => (
+                                    <option key={i + 1} value={i + 1} className="bg-[#0a0a0a] text-slate-200 font-sans">
+                                      Episode {i + 1}
+                                    </option>
+                                  ))}
+                                </select>
+                              )}
+                            </div>
+
+                            {/* Plus Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const nextVal = isManualOverride 
+                                  ? selectedEpisode + 1 
+                                  : Math.min(episodesInActiveSeason, selectedEpisode + 1);
+                                setSelectedEpisode(nextVal);
+                              }}
+                              disabled={!isManualOverride && selectedEpisode >= episodesInActiveSeason}
+                              className="w-10 h-10 flex items-center justify-center bg-black hover:bg-white/5 border border-white/10 text-slate-300 disabled:opacity-20 disabled:hover:bg-black rounded-xl transition-all cursor-pointer"
+                              id="episode-plus-btn"
+                            >
+                              <Plus className="w-4 h-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </div>
