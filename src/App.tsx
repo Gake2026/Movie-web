@@ -37,8 +37,8 @@ const DownloadManager = lazy(() => import('./components/DownloadManager'));
 const STREAM_SERVERS: ServerOption[] = [
   {
     id: "vidsrc_to",
-    name: "VidSrc TO Media (Recommended)",
-    description: "Highly stable HTML5 video backend. Zero intrusive redirect actions.",
+    name: "VidSrc TO Media",
+    description: "Clean HTML5 player, direct connection (no server route).",
     urlPattern: (imdbId, season, episode) => {
       if (season && episode) {
         return `https://vidsrc.to/embed/tv/${imdbId}/${season}/${episode}`;
@@ -48,8 +48,8 @@ const STREAM_SERVERS: ServerOption[] = [
   },
   {
     id: "embed2",
-    name: "2Embed (Backup)",
-    description: "Reliable multi-source player. Good fallback when others are blocked.",
+    name: "2Embed (Recommended)",
+    description: "Reliable multi-source player, routed through our server — no DNS change needed.",
     urlPattern: (imdbId, season, episode) => {
       if (season && episode) {
         return `https://www.2embed.cc/embedtv/${imdbId}&s=${season}&e=${episode}`;
@@ -85,7 +85,7 @@ export default function App() {
   // Focus Modal and Player details
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [playerState, setPlayerState] = useState<PlayerState | null>(null);
-  const [selectedServerId, setSelectedServerId] = useState<string>('vidsrc_to');
+  const [selectedServerId, setSelectedServerId] = useState<string>('embed2');
 
   // "Server route" = proxy gateway traffic through this site's own server, so
   // playback works on any DNS/ISP without changing the phone's DNS.
@@ -93,8 +93,8 @@ export default function App() {
   const [dnsBypass, setDnsBypass] = useState<boolean>(true);
   useEffect(() => {
     let cancelled = false;
-    // Probe with a real embed URL (guaranteed HTML 200 when the proxy is up).
-    fetch(`/api/embed?u=${encodeURIComponent('https://vidsrc.to/embed/movie/tt0111161')}`, { method: 'HEAD' })
+    // Probe with a real embed URL on a gateway that works through the proxy.
+    fetch(`/api/embed?u=${encodeURIComponent('https://www.2embed.cc/embed/tt0111161')}`, { method: 'HEAD' })
       .then((r) => { if (!cancelled) setDnsBypass(r.ok); })
       .catch(() => { if (!cancelled) setDnsBypass(false); });
     return () => { cancelled = true; };
@@ -449,7 +449,9 @@ export default function App() {
 
   // Get current Iframe streaming URL matching servers setup.
   // When dnsBypass is on, the gateway URL is routed through this site's own
-  // server (/api/embed) so ISP DNS blocks don't matter.
+  // server (/api/embed) so ISP DNS blocks don't matter. vidsrc.to blocks
+  // datacenter IPs, so it only works in direct mode — the rest proxy fine.
+  const PROXY_OK_SERVERS = new Set(['embed2', 'streamimdb']);
   const getStreamUrl = () => {
     if (!playerState) return '';
     const activeServer = STREAM_SERVERS.find(s => s.id === playerState.serverId) || STREAM_SERVERS[0];
@@ -458,7 +460,8 @@ export default function App() {
       playerState.season || undefined,
       playerState.episode || undefined
     );
-    return dnsBypass ? `/api/embed?u=${encodeURIComponent(direct)}` : direct;
+    const useProxy = dnsBypass && PROXY_OK_SERVERS.has(activeServer.id);
+    return useProxy ? `/api/embed?u=${encodeURIComponent(direct)}` : direct;
   };
 
   return (
