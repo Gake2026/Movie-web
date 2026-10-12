@@ -3,6 +3,7 @@ import path from "path";
 import dotenv from "dotenv";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
+import { registerProxy } from "./proxy";
 
 dotenv.config();
 
@@ -10,6 +11,10 @@ const app = express();
 const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
 
 app.use(express.json());
+
+// Stream proxy: routes gateway traffic through this server's own domain so
+// playback works on any DNS / ISP without the phone changing DNS settings.
+registerProxy(app);
 
 // Lazy-initialized Gemini client
 let aiInstance: GoogleGenAI | null = null;

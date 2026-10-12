@@ -10,6 +10,8 @@ interface VideoPlayerProps {
   iframePatternUrl: string;
   servers?: ServerOption[];
   onServerChange?: (serverId: string) => void;
+  dnsBypass?: boolean;
+  onDnsBypassChange?: (enabled: boolean) => void;
 }
 
 export default function VideoPlayer({
@@ -18,7 +20,9 @@ export default function VideoPlayer({
   isOfflineMode,
   iframePatternUrl,
   servers,
-  onServerChange
+  onServerChange,
+  dnsBypass,
+  onDnsBypassChange
 }: VideoPlayerProps) {
   const { activeMedia, season, episode, serverId } = playerState;
   
@@ -38,10 +42,10 @@ export default function VideoPlayer({
   const [showSandboxAlert, setShowSandboxAlert] = useState(true);
 
   // User can choose sandbox style:
-  // - 'unrestricted': Bypasses local mobile blocks completely (No Sandbox). Default for 100% mobile launch success.
+  // - 'safe': Strict safety sandbox — blocks ad popups and top-frame redirects. Default.
   // - 'compat': Loose sandbox that blocks aggressive ads but allows plugins/redirects.
-  // - 'safe': Strict safety sandbox.
-  const [sandboxMode, setSandboxMode] = useState<'unrestricted' | 'compat' | 'safe'>('unrestricted');
+  // - 'unrestricted': Bypasses local mobile blocks completely (No Sandbox). Use only if a player won't load otherwise.
+  const [sandboxMode, setSandboxMode] = useState<'unrestricted' | 'compat' | 'safe'>('safe');
 
   // Web Audio visualization ref for offline playing
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -243,6 +247,28 @@ export default function VideoPlayer({
                 </div>
               </div>
 
+              {/* Server route toggle: proxy through this site's own domain (no DNS change needed) */}
+              {onDnsBypassChange && (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[8px] sm:text-[9px] font-bold tracking-widest font-mono text-slate-400 uppercase">
+                    Route:
+                  </span>
+                  <button
+                    onClick={() => onDnsBypassChange(!dnsBypass)}
+                    className={`px-2.5 py-0.5 rounded-full flex items-center gap-1 border transition-all text-[8px] sm:text-[9px] font-black tracking-widest font-mono uppercase cursor-pointer ${
+                      dnsBypass
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                        : 'bg-slate-500/10 border-slate-500/20 text-slate-400'
+                    }`}
+                    id="player-route-toggle"
+                    title="Route streams through this site's own server — bypasses ISP DNS blocks without changing your phone's DNS"
+                  >
+                    <span className={`w-1.5 h-1.5 rounded-full shrink-0 ${dnsBypass ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'}`} />
+                    {dnsBypass ? 'Server' : 'Direct'}
+                  </button>
+                </div>
+              )}
+
               {/* Sandbox Shield controller for iOS/Android compatibility */}
               <div className="flex items-center gap-1.5">
                 <span className="text-[8px] sm:text-[9px] font-bold tracking-widest font-mono text-slate-400 uppercase">
@@ -330,7 +356,7 @@ export default function VideoPlayer({
                       <span className="text-[9px] font-black tracking-widest uppercase bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded">Active Protection</span>
                     </h4>
                     <p className="text-slate-400 text-[11px] leading-relaxed">
-                      If the video screen is black or infinite loads, it indicates your mobile browser (e.g. iOS Safari / Chrome Android) blocks sandboxed frames. Keep <strong className="text-brand-400">Shield OFF</strong>, or try switching <strong className="text-cyan-400">Gateways</strong> or tapping <strong className="text-brand-400">Direct Link</strong>!
+                      Shield is ON: ad popups and forced redirects are blocked. If the video screen is black or loads forever, try switching <strong className="text-cyan-400">Gateways</strong>, or loosen the <strong className="text-brand-400">Shield</strong> (Lite Ad-Block / Off) for stubborn players.
                     </p>
                   </div>
                 </div>

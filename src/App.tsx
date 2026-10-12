@@ -22,10 +22,12 @@ import {
 // Types and static featured catalog
 import { MediaItem, PlayerState, ServerOption, DownloadItem, MediaType } from './types';
 import { FEATURED_MEDIA } from './data/featured';
+import { CATALOG_SECTIONS } from './data/catalog';
 
 // Modular Components
 import Header from './components/Header';
 import MediaGrid from './components/MediaGrid';
+import MediaRow from './components/MediaRow';
 import MediaDetailsModal from './components/MediaDetailsModal';
 import VideoPlayer from './components/VideoPlayer';
 import DownloadManager from './components/DownloadManager';
@@ -33,30 +35,8 @@ import DownloadManager from './components/DownloadManager';
 // Free Stream embed server options
 const STREAM_SERVERS: ServerOption[] = [
   {
-    id: "streamimdb",
-    name: "StreamIMDb (Recommended)",
-    description: "Maximum-speed direct movie & series gateway on streamimdb.ru.",
-    urlPattern: (imdbId, season, episode) => {
-      if (season && episode) {
-        return `https://streamimdb.ru/embed/tv/${imdbId}/${season}/${episode}`;
-      }
-      return `https://streamimdb.ru/embed/movie/${imdbId}`;
-    }
-  },
-  {
-    id: "multiembed",
-    name: "MultiEmbed Fast Proxy (Recommended Backup)",
-    description: "Excellent auto-switching player index. Solid buffer speeds.",
-    urlPattern: (imdbId, season, episode) => {
-      if (season && episode) {
-        return `https://multiembed.mov/?video_id=${imdbId}&season=${season}&episode=${episode}`;
-      }
-      return `https://multiembed.mov/?video_id=${imdbId}`;
-    }
-  },
-  {
     id: "vidsrc_to",
-    name: "VidSrc TO Media",
+    name: "VidSrc TO Media (Recommended)",
     description: "Highly stable HTML5 video backend. Zero intrusive redirect actions.",
     urlPattern: (imdbId, season, episode) => {
       if (season && episode) {
@@ -66,25 +46,36 @@ const STREAM_SERVERS: ServerOption[] = [
     }
   },
   {
-    id: "vidsrc_xyz",
-    name: "VidSrc.xyz Protocol",
-    description: "High-speed media server. Perfect frame rendering and compatibility.",
+    id: "embed2",
+    name: "2Embed (Backup)",
+    description: "Reliable multi-source player. Good fallback when others are blocked.",
     urlPattern: (imdbId, season, episode) => {
       if (season && episode) {
-        return `https://vidsrc.xyz/embed/tv/${imdbId}/${season}/${episode}`;
+        return `https://www.2embed.cc/embedtv/${imdbId}&s=${season}&e=${episode}`;
       }
-      return `https://vidsrc.xyz/embed/movie/${imdbId}`;
+      return `https://www.2embed.cc/embed/${imdbId}`;
     }
   },
   {
-    id: "embed_su",
-    name: "Embed SU Engine",
-    description: "Fast multi-lingual audio track streams. Solid high-fidelity backup.",
+    id: "smashy",
+    name: "SmashyStream",
+    description: "Lightweight backup gateway. Handy on restricted networks.",
     urlPattern: (imdbId, season, episode) => {
       if (season && episode) {
-        return `https://embed.su/embed/tv/${imdbId}/${season}/${episode}`;
+        return `https://smashystream.xyz/embed/tv/${imdbId}/${season}/${episode}`;
       }
-      return `https://embed.su/embed/movie/${imdbId}`;
+      return `https://smashystream.xyz/embed/movie/${imdbId}`;
+    }
+  },
+  {
+    id: "streamimdb",
+    name: "StreamIMDb (Last Resort)",
+    description: "Ad-heavy gateway — only use if the others are blocked on your network.",
+    urlPattern: (imdbId, season, episode) => {
+      if (season && episode) {
+        return `https://streamimdb.ru/embed/tv/${imdbId}/${season}/${episode}`;
+      }
+      return `https://streamimdb.ru/embed/movie/${imdbId}`;
     }
   }
 ];
@@ -104,7 +95,19 @@ export default function App() {
   // Focus Modal and Player details
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
   const [playerState, setPlayerState] = useState<PlayerState | null>(null);
-  const [selectedServerId, setSelectedServerId] = useState<string>('streamimdb');
+  const [selectedServerId, setSelectedServerId] = useState<string>('vidsrc_to');
+
+  // "Server route" = proxy gateway traffic through this site's own server, so
+  // playback works on any DNS/ISP without changing the phone's DNS.
+  // Only available when the site is served by the Node server (not static hosting).
+  const [dnsBypass, setDnsBypass] = useState<boolean>(true);
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/embed?u=${encodeURIComponent('https://vidsrc.to/')}`)
+      .then((r) => { if (!cancelled) setDnsBypass(r.ok); })
+      .catch(() => { if (!cancelled) setDnsBypass(false); });
+    return () => { cancelled = true; };
+  }, []);
 
   // State for the on-demand quick streamer
   const [onDemandTitle, setOnDemandTitle] = useState("");
@@ -224,8 +227,10 @@ export default function App() {
     }
   }, [searchQuery]);
 
-  // Catalog filtered items (Filters between search results or featured baseline)
-  const currentCatalog = searchQuery ? searchResults : FEATURED_MEDIA;
+  // Catalog filtered items (Filters between search results or library baseline).
+  // The library baseline is the full real-poster catalog, flattened.
+  const libraryItems: MediaItem[] = CATALOG_SECTIONS.flatMap(s => s.items);
+  const currentCatalog = searchQuery ? searchResults : libraryItems;
   const filteredMedia = currentCatalog.filter((item) => {
     // If we are in offline mode, only show downloaded items!
     if (isOfflineMode) {
@@ -237,8 +242,8 @@ export default function App() {
     return item.type === selectedType;
   });
 
-  // Extract a Hero Spotlight cover (Features Interstellar as index)
-  const spotlightMedia = FEATURED_MEDIA[0];
+  // Extract a Hero Spotlight cover (first trending title with a real poster)
+  const spotlightMedia = CATALOG_SECTIONS[0]?.items[0] || FEATURED_MEDIA[0];
 
   // List of IDs for badge indicators
   const completedDownloadKeys = downloads
@@ -451,15 +456,18 @@ export default function App() {
     setActiveTab('playing');
   };
 
-  // Get current Iframe streaming URL matching servers setup
+  // Get current Iframe streaming URL matching servers setup.
+  // When dnsBypass is on, the gateway URL is routed through this site's own
+  // server (/api/embed) so ISP DNS blocks don't matter.
   const getStreamUrl = () => {
     if (!playerState) return '';
     const activeServer = STREAM_SERVERS.find(s => s.id === playerState.serverId) || STREAM_SERVERS[0];
-    return activeServer.urlPattern(
+    const direct = activeServer.urlPattern(
       playerState.activeMedia!.imdbId,
       playerState.season || undefined,
       playerState.episode || undefined
     );
+    return dnsBypass ? `/api/embed?u=${encodeURIComponent(direct)}` : direct;
   };
 
   return (
@@ -867,35 +875,55 @@ export default function App() {
               </motion.div>
             )}
 
-            {/* Main Title of the current collection */}
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-brand-400" />
-                <span>
-                  {searchQuery 
-                    ? `Results for "${searchQuery}"` 
-                    : isOfflineMode 
-                    ? 'Your Saved Downloads' 
-                    : 'Trending Releases'}
-                </span>
-                {searchLoading && (
-                  <span className="w-2.5 h-2.5 rounded-full bg-brand-500 animate-ping ml-2" />
-                )}
-              </h2>
+            {/* Library: category rows like streamimdb (only when browsing, not searching/offline) */}
+            {!searchQuery && !isOfflineMode ? (
+              <div className="mt-2">
+                {CATALOG_SECTIONS.map((section) => {
+                  const items = section.items.filter((item) =>
+                    selectedType === 'all' ? true : item.type === selectedType
+                  );
+                  return (
+                    <MediaRow
+                      key={section.title}
+                      title={section.title}
+                      items={items}
+                      onSelectMedia={setSelectedMedia}
+                      onInstantPlay={handleInstantPlay}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <>
+                {/* Main Title of the current collection */}
+                <div className="flex items-center justify-between mb-6">
+                  <h2 className="text-lg sm:text-xl font-bold font-display text-white flex items-center gap-2">
+                    <TrendingUp className="w-5 h-5 text-brand-400" />
+                    <span>
+                      {searchQuery
+                        ? `Results for "${searchQuery}"`
+                        : 'Your Saved Downloads'}
+                    </span>
+                    {searchLoading && (
+                      <span className="w-2.5 h-2.5 rounded-full bg-brand-500 animate-ping ml-2" />
+                    )}
+                  </h2>
 
-              <span className="text-xs text-slate-500 font-mono">
-                {filteredMedia.length} titles found
-              </span>
-            </div>
+                  <span className="text-xs text-slate-500 font-mono">
+                    {filteredMedia.length} titles found
+                  </span>
+                </div>
 
-            {/* Media Grid Display viewport */}
-            <MediaGrid
-              mediaItems={filteredMedia}
-              onSelectMedia={setSelectedMedia}
-              onInstantPlay={handleInstantPlay}
-              isOfflineMode={isOfflineMode}
-              downloadedIds={completedDownloadKeys}
-            />
+                {/* Media Grid Display viewport */}
+                <MediaGrid
+                  mediaItems={filteredMedia}
+                  onSelectMedia={setSelectedMedia}
+                  onInstantPlay={handleInstantPlay}
+                  isOfflineMode={isOfflineMode}
+                  downloadedIds={completedDownloadKeys}
+                />
+              </>
+            )}
 
           </div>
         )}
@@ -921,6 +949,8 @@ export default function App() {
             isOfflineMode={isOfflineMode}
             iframePatternUrl={getStreamUrl()}
             servers={STREAM_SERVERS}
+            dnsBypass={dnsBypass}
+            onDnsBypassChange={setDnsBypass}
             onServerChange={(newServerId) => {
               setSelectedServerId(newServerId);
               setPlayerState(prev => prev ? { ...prev, serverId: newServerId } : null);
