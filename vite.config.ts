@@ -3,11 +3,13 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
-import { cloudflare } from "@cloudflare/vite-plugin";
+// NOTE: the Cloudflare vite plugin was removed — this app deploys to Render
+// (Node), not Cloudflare Workers. Re-add "@cloudflare/vite-plugin" here if you
+// ever switch back to a wrangler deployment.
 
 export default defineConfig(() => {
   return {
-    plugins: [react(), tailwindcss(), cloudflare()],
+    plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
