@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Play, 
@@ -28,9 +28,10 @@ import { CATALOG_SECTIONS } from './data/catalog';
 import Header from './components/Header';
 import MediaGrid from './components/MediaGrid';
 import MediaRow from './components/MediaRow';
-import MediaDetailsModal from './components/MediaDetailsModal';
-import VideoPlayer from './components/VideoPlayer';
-import DownloadManager from './components/DownloadManager';
+// Heavy views are code-split so the library home paints fast on mobile.
+const MediaDetailsModal = lazy(() => import('./components/MediaDetailsModal'));
+const VideoPlayer = lazy(() => import('./components/VideoPlayer'));
+const DownloadManager = lazy(() => import('./components/DownloadManager'));
 
 // Free Stream embed server options
 const STREAM_SERVERS: ServerOption[] = [
@@ -54,17 +55,6 @@ const STREAM_SERVERS: ServerOption[] = [
         return `https://www.2embed.cc/embedtv/${imdbId}&s=${season}&e=${episode}`;
       }
       return `https://www.2embed.cc/embed/${imdbId}`;
-    }
-  },
-  {
-    id: "smashy",
-    name: "SmashyStream",
-    description: "Lightweight backup gateway. Handy on restricted networks.",
-    urlPattern: (imdbId, season, episode) => {
-      if (season && episode) {
-        return `https://smashystream.xyz/embed/tv/${imdbId}/${season}/${episode}`;
-      }
-      return `https://smashystream.xyz/embed/movie/${imdbId}`;
     }
   },
   {
@@ -103,7 +93,8 @@ export default function App() {
   const [dnsBypass, setDnsBypass] = useState<boolean>(true);
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/embed?u=${encodeURIComponent('https://vidsrc.to/')}`)
+    // Probe with a real embed URL (guaranteed HTML 200 when the proxy is up).
+    fetch(`/api/embed?u=${encodeURIComponent('https://vidsrc.to/embed/movie/tt0111161')}`, { method: 'HEAD' })
       .then((r) => { if (!cancelled) setDnsBypass(r.ok); })
       .catch(() => { if (!cancelled) setDnsBypass(false); });
     return () => { cancelled = true; };
@@ -930,15 +921,18 @@ export default function App() {
 
         {/* Downloads Tab View */}
         {activeTab === 'downloads' && (
+          <Suspense fallback={<div className="py-20 text-center text-slate-500 text-xs font-mono">Loading…</div>}>
           <DownloadManager
             downloads={downloads}
             onDeleteDownload={handleDeleteDownload}
             onPlayOffline={handlePlayOffline}
           />
+          </Suspense>
         )}
 
         {/* Active Cinema Theater Viewport */}
         {activeTab === 'playing' && playerState && (
+          <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-slate-500 text-xs font-mono">Loading player…</div>}>
           <VideoPlayer
             playerState={playerState}
             onClose={() => {
@@ -956,12 +950,14 @@ export default function App() {
               setPlayerState(prev => prev ? { ...prev, serverId: newServerId } : null);
             }}
           />
+          </Suspense>
         )}
 
       </main>
 
       {/* Details Dialog Modals Backdrop */}
       {selectedMedia && (
+        <Suspense fallback={null}>
         <MediaDetailsModal
           media={selectedMedia}
           onClose={() => setSelectedMedia(null)}
@@ -973,6 +969,7 @@ export default function App() {
           downloadedIds={completedDownloadKeys}
           activeDownloads={activeDownloadKeys}
         />
+        </Suspense>
       )}
 
       {/* Footer information bar */}

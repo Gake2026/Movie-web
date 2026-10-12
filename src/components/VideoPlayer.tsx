@@ -42,10 +42,10 @@ export default function VideoPlayer({
   const [showSandboxAlert, setShowSandboxAlert] = useState(true);
 
   // User can choose sandbox style:
-  // - 'safe': Strict safety sandbox — blocks ad popups and top-frame redirects. Default.
+  // - 'unrestricted': No sandbox — required by most players (2Embed, StreamIMDb refuse sandboxed frames). Default.
   // - 'compat': Loose sandbox that blocks aggressive ads but allows plugins/redirects.
-  // - 'unrestricted': Bypasses local mobile blocks completely (No Sandbox). Use only if a player won't load otherwise.
-  const [sandboxMode, setSandboxMode] = useState<'unrestricted' | 'compat' | 'safe'>('safe');
+  // - 'safe': Strict safety sandbox — blocks ad popups and top-frame redirects, but some players won't load.
+  const [sandboxMode, setSandboxMode] = useState<'unrestricted' | 'compat' | 'safe'>('unrestricted');
 
   // Web Audio visualization ref for offline playing
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -356,7 +356,7 @@ export default function VideoPlayer({
                       <span className="text-[9px] font-black tracking-widest uppercase bg-cyan-500/20 text-cyan-400 px-1.5 py-0.5 rounded">Active Protection</span>
                     </h4>
                     <p className="text-slate-400 text-[11px] leading-relaxed">
-                      Shield is ON: ad popups and forced redirects are blocked. If the video screen is black or loads forever, try switching <strong className="text-cyan-400">Gateways</strong>, or loosen the <strong className="text-brand-400">Shield</strong> (Lite Ad-Block / Off) for stubborn players.
+                      Shield is OFF so players load — most gateways refuse sandboxed frames. If a player spams popups or redirects, switch <strong className="text-brand-400">Shield</strong> to Max Ad-Block (some players may then refuse to load — switch back if the screen stays black), or try another <strong className="text-cyan-400">Gateway</strong>.
                     </p>
                   </div>
                 </div>

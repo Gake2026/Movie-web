@@ -64,6 +64,17 @@ const SECTIONS = [
 
 const UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
 
+// Small poster for cards + larger banner for hero/backdrops — keeps the
+// library fast (IMDb originals are ~2MB each; these are ~12KB / ~150KB).
+function sized(url, spec) {
+  if (url.includes("m.media-amazon.com") && url.includes("._V1_.jpg")) {
+    return url.replace("._V1_.jpg", `._V1_${spec}_.jpg`);
+  }
+  return url;
+}
+const POSTER_SPEC = "QL75_UX190_CR0,0,190,281";
+const BANNER_SPEC = "QL75_UX1280";
+
 async function fetchPoster(title, imdbId) {
   const url = `https://v3.sg.media-imdb.com/suggestion/x/${encodeURIComponent(title)}.json`;
   const r = await fetch(url, { headers: { "User-Agent": UA, Accept: "application/json" } });
@@ -90,7 +101,7 @@ for (const sec of SECTIONS) {
           id: imdbId, title: p.title || title, type: sec.type,
           year: p.year || "2024", rating: "8.2",
           genres: ["Drama"], overview: `${p.title || title} — stream instantly in HD.`,
-          imdbId, poster: p.poster, banner: p.poster,
+          imdbId, poster: sized(p.poster, POSTER_SPEC), banner: sized(p.poster, BANNER_SPEC),
         });
         console.log(`  ok  ${p.title} ${imdbId}`);
       } else {

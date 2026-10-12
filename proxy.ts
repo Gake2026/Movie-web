@@ -20,7 +20,6 @@ const GATEWAY_HOSTS = new Set([
   "vidsrc.to",
   "www.2embed.cc",
   "2embed.cc",
-  "smashystream.xyz",
   "streamimdb.ru",
 ]);
 
@@ -149,7 +148,7 @@ function rewriteCssUrls(css: string, base: string): string {
 
 const PATCH_SCRIPT = `(function(){
 var PX="/api/px?u=";
-var HOSTS=/^(vidsrc\\.to|2embed\\.cc|www\\.2embed\\.cc|smashystream\\.xyz|streamimdb\\.ru)$/;
+var HOSTS=/^(vidsrc\\.to|2embed\\.cc|www\\.2embed\\.cc|streamimdb\\.ru)$/;
 function proxify(url){
   try{
     var u=new URL(url,document.baseURI);
